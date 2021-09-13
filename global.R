@@ -6,9 +6,20 @@ library(dplyr)
 library(rsample)
 library(DT)
 library(formattable)
+library(fontawesome)
+library(shiny)
+library(shinydashboard)
+library(devtools)
+library(ggplot2)
+library(magrittr)
+library(plotly)
+library(purrr)
+library(readr)
+library(shinyWidgets)
+library(tibble)
+library(utils)
 
-
-Germany_2005_full_data_3_6_dta <- read_stata("~/Downloads/R FOR DATA ANALYSIS AND SCIENCE/Germany-2005--full data-3,6.dta.zip")
+Germany_2005_full_data_3_6_dta <- read_stata("Germany-2005--full data-3,6.dta.zip")
 german_enterprise_data <- data.frame(Germany_2005_full_data_3_6_dta)
 
 # Q.60 Has your company undertaken any of the following initiatives over the last 36 months? 
@@ -84,57 +95,57 @@ train_german_ent_data <- training(german_enterprise_split_data)
 test_german_ent_data <- testing(german_enterprise_split_data)
 
 ## ----------------------------------------------------------
-## create response variable
-# y <- train_german_ent_data[, "upgrade_existingproduct_line"]
-## create feature / predictor variables
- feature_names <- setdiff(names(train_german_ent_data), "upgrade_existingproduct_line")
- x <- train_german_ent_data[, feature_names]
-View(x)
-
-## setup 10 fold cross-validation
-train_control = trainControl(
-  method = "cv",
-  number = 10
-)
-
-### train naive bayes model
-upgradeproduct_naiveBayes <- train(
-  x = x, y = y, trControl = train_control, method = "nb"
-)
-
-confusionMatrix(upgradeproduct_naiveBayes)
-plot(upgradeproduct_naiveBayes)
-
-## testing the model developed
-pred.test <- predict(upgradeproduct_naiveBayes, newdata = test_german_ent_data)
-confusionMatrix(pred.test, test_german_ent_data$upgrade_existingproduct_line)
-
-
-## tuning parameters to improve model
-search_grid <- expand.grid(
-  usekernel = c(TRUE, FALSE),
-  fL = 0:15,
-  adjust = seq(0, 15, by = 1)
-)
-
-upgradeproduct_naiveBayes_2 <- train(
-  x = x, 
-  y = y, 
-  method = "nb",
-  trControl = train_control, 
-  tuneGrid = search_grid, 
-  preProc = c("BoxCox", "center", "scale", "pca")
-)
-
-upgradeproduct_naiveBayes_2$results%>%
-  top_n(5, wt = Accuracy) %>%
-  arrange(desc(Accuracy))
-
-plot(upgradeproduct_naiveBayes_2)
-confusionMatrix(upgradeproduct_naiveBayes_2)
-
-upgrade_predict_2 <- predict(upgradeproduct_naiveBayes_2, newdata = test_german_ent_data)
-confusionMatrix(upgrade_predict_2, test_german_ent_data$upgrade_existingproduct_line)
+# ## create response variable
+#  y <- train_german_ent_data[, "upgrade_existingproduct_line"]
+# ## create feature / predictor variables
+#  feature_names <- setdiff(names(train_german_ent_data), "upgrade_existingproduct_line")
+#  x <- train_german_ent_data[, feature_names]
+# ##View(x)
+# 
+# ## setup 10 fold cross-validation
+# train_control = trainControl(
+#   method = "cv",
+#   number = 10
+# )
+# 
+# ### train naive bayes model
+# upgradeproduct_naiveBayes <- train(
+#   x = x, y = y, trControl = train_control, method = "nb"
+# )
+# 
+# confusionMatrix(upgradeproduct_naiveBayes)
+# plot(upgradeproduct_naiveBayes)
+# 
+# ## testing the model developed
+# pred.test <- predict(upgradeproduct_naiveBayes, newdata = test_german_ent_data)
+# confusionMatrix(pred.test, test_german_ent_data$upgrade_existingproduct_line)
+# 
+# 
+# ## tuning parameters to improve model
+# search_grid <- expand.grid(
+#   usekernel = c(TRUE, FALSE),
+#   fL = 0:15,
+#   adjust = seq(0, 15, by = 1)
+# )
+# 
+# upgradeproduct_naiveBayes_2 <- train(
+#   x = x, 
+#   y = y, 
+#   method = "nb",
+#   trControl = train_control, 
+#   tuneGrid = search_grid, 
+#   preProc = c("BoxCox", "center", "scale", "pca")
+# )
+# 
+# upgradeproduct_naiveBayes_2$results%>%
+#   top_n(5, wt = Accuracy) %>%
+#   arrange(desc(Accuracy))
+# 
+# plot(upgradeproduct_naiveBayes_2)
+# confusionMatrix(upgradeproduct_naiveBayes_2)
+# 
+# upgrade_predict_2 <- predict(upgradeproduct_naiveBayes_2, newdata = test_german_ent_data)
+# confusionMatrix(upgrade_predict_2, test_german_ent_data$upgrade_existingproduct_line)
 
 
 ###### h2o for naive bayes
@@ -145,9 +156,9 @@ h2o_train_upgradeproduct <- train_german_ent_data %>%
   mutate_if(is.factor, factor, ordered = FALSE) %>%
   as.h2o()
 
-(h2o_test_upgradeproduct <- test_german_ent_data %>%
+h2o_test_upgradeproduct <- test_german_ent_data %>%
   mutate_if(is.factor, factor, ordered = FALSE) %>%
-  as.h2o())
+  as.h2o()
 
 x_h2o = setdiff(names(train_german_ent_data), "upgrade_existingproduct_line")
 
@@ -172,18 +183,18 @@ h2o_hyper_params <- list(
   laplace = seq(0, 5, by = 1)
 )
 
-h2o_grid <- h2o.grid(
-  algorithm = "naivebayes",
-  grid_id = "nb_id",
-  hyper_params = h2o_hyper_params,
-  training_frame = h2o_train_upgradeproduct,
-  nfolds = 10,
-  x = x_h2o,
-  y = y_h2o
-)
-
+ # h2o_grid <- h2o.grid(
+ #   algorithm = "naivebayes",
+ #   grid_id = "nb_id",
+ #   hyper_params = h2o_hyper_params,
+ #   training_frame = h2o_train_upgradeproduct,
+ #   nfolds = 10,
+ #   x = x_h2o,
+ #   y = y_h2o
+ # )
+ grid_id = "nb_id"
 ### sort model by accuracy
-h2o_sorted_grid <- h2o.getGrid(grid_id = "nb_id", sort_by = "accuracy", decreasing = TRUE)
+h2o_sorted_grid <- h2o.getGrid("nb_id", sort_by = "accuracy", decreasing = TRUE)
 h2o_best_model_retrive <- h2o_sorted_grid@model_ids[[1]]
 h20_best_model <- h2o.getModel(h2o_best_model_retrive)
 
@@ -226,7 +237,7 @@ data.frame(fpr = fpr_tested_model, tpr = tpr_tested_model) %>%
 h2o.predict(h20_best_model, newdata = h2o_test_upgradeproduct)
 
 h2o.confusionMatrix(h20_best_model, newdata = h2o_test_upgradeproduct)
-(test_confusionMatrix <- h2o.confusionMatrix(h20_best_model, newdata = h2o_test_upgradeproduct))
+test_confusionMatrix <- h2o.confusionMatrix(h20_best_model, newdata = h2o_test_upgradeproduct)
 
 test_rmse <- h2o.rmse(test_model)
 test_gini <- h2o.giniCoef(test_model)
@@ -235,26 +246,22 @@ row.names(test_confusionMatrix)
 
 test_confusionMatrix <- test_confusionMatrix %>%
   dplyr::select("Upgraded existing product line" = 1, "No upgrade of existing product line" = 2, Error, Rate)
-View(test_confusionMatrix)
+#View(test_confusionMatrix)
 h2o.precision(test_model)
-(test_prediction <- h2o.predict(h20_best_model, newdata = h2o_test_upgradeproduct))
+test_prediction <- h2o.predict(h20_best_model, newdata = h2o_test_upgradeproduct)
 
-(test_prediction_with_rowid <- rowid_to_column(as.data.frame(test_prediction)))
-(test_data_with_rowid <- rowid_to_column(as.data.frame(h2o_test_upgradeproduct)))
+test_prediction_with_rowid <- rowid_to_column(as.data.frame(test_prediction))
+test_data_with_rowid <- rowid_to_column(as.data.frame(h2o_test_upgradeproduct))
 
-View(test_prediction_with_rowid)
-(test_predict_join <- full_join(test_data_with_rowid, test_prediction_with_rowid) %>%
-    select(rowid, upgrade_existingproduct_line, predict))
+#View(test_prediction_with_rowid)
+test_predict_join <- full_join(test_data_with_rowid, test_prediction_with_rowid) %>%
+    select(rowid, upgrade_existingproduct_line, predict)
 #test_predict_join$upgrade_existingproduct_line[levels]
 
 levels(test_predict_join$upgrade_existingproduct_line)[1] <- "Upgraded product line"
 levels(test_predict_join$upgrade_existingproduct_line)[2] <- "No upgrade of product line"
 levels(test_predict_join$predict)[1]<- "Upgraded product line"
 levels(test_predict_join$predict)[2]<- "No upgrade of product line"
-test_predict_join
+#test_predict_join
   
-
-new <- test_predict_join$rowid
-
-  colnames(h2o_test_upgradeproduct)
   

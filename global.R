@@ -177,26 +177,39 @@ h2o_naive_bayes <- h2o.naiveBayes(
 h2o.confusionMatrix(h2o_naive_bayes)
 
 ###### parameter tuning 
-# preprocess_h2o <- preProcess(train_german_ent_data, method = c("BoxCox", "center", "scale", "pca"))
+ preprocess_h2o <- preProcess(train_german_ent_data, method = c("BoxCox", "center", "scale", "pca"))
+tune_train <-  predict(preprocess_h2o, train_german_ent_data) %>%
+  mutate_if(is.factor, factor, ordered = F) %>%
+  as.h2o()
+
+tune_test <- predict(preprocess_h2o, test_german_ent_data) %>%
+  mutate_if(is.factor, factor, ordered = F) %>%
+  as.h2o()
 
 h2o_hyper_params <- list(
-  laplace = seq(0, 5, by = 1)
+  laplace = seq(0, 15, by = 0.5)
 )
 
- # h2o_grid <- h2o.grid(
- #   algorithm = "naivebayes",
- #   grid_id = "nb_id",
- #   hyper_params = h2o_hyper_params,
- #   training_frame = h2o_train_upgradeproduct,
- #   nfolds = 10,
- #   x = x_h2o,
- #   y = y_h2o
- # )
- grid_id = "nb_id"
+  h2o_grid <- h2o.grid(
+    algorithm = "naivebayes",
+   # grid_id = "nb_id",
+    hyper_params = h2o_hyper_params,
+    training_frame = tune_train,
+    nfolds = 10,
+    x = x_h2o,
+    y = y_h2o
+  )
+  
+ # retrieve grid_id 
+  grid_id <- h2o_grid@grid_id
+  
+  
 ### sort model by accuracy
-h2o_sorted_grid <- h2o.getGrid("nb_id", sort_by = "accuracy", decreasing = TRUE)
-h2o_best_model_retrive <- h2o_sorted_grid@model_ids[[1]]
-h20_best_model <- h2o.getModel(h2o_best_model_retrive)
+(h2o_sorted_grid <- h2o.getGrid(grid_id = grid_id, sort_by = "accuracy", decreasing = TRUE))
+(h2o_best_model_retrive <- h2o_sorted_grid@model_ids[[1]])
+(h20_best_model <- h2o.getModel(h2o_best_model_retrive))
+
+#h2o.performance(h20_best_model, newdata = tune_test)
 
 ## confusinmatrx 
 h2o.confusionMatrix(h20_best_model)
@@ -222,7 +235,7 @@ data.frame(fpr = fpr, tpr = tpr) %>%
 
 #############################################################
 ## evaluate model with test data
-test_model <- h2o.performance(h20_best_model, h2o_test_upgradeproduct, xval = TRUE)
+test_model <- h2o.performance(h20_best_model, tune_test, xval = TRUE)
 
 tpr_tested_model <- h2o.tpr(test_model) %>%
   .[["tpr"]]
@@ -234,13 +247,13 @@ data.frame(fpr = fpr_tested_model, tpr = tpr_tested_model) %>%
   ggplot(aes(fpr, tpr)) + geom_line() + ggtitle(sprintf("AUC: %f", h2o.auc(test_model)))
 
 ## use model to predict 
-h2o.predict(h20_best_model, newdata = h2o_test_upgradeproduct)
+h2o.predict(h20_best_model, newdata = tune_test)
 
-h2o.confusionMatrix(h20_best_model, newdata = h2o_test_upgradeproduct)
-test_confusionMatrix <- h2o.confusionMatrix(h20_best_model, newdata = h2o_test_upgradeproduct)
+h2o.confusionMatrix(h20_best_model, newdata = tune_test)
+test_confusionMatrix <- h2o.confusionMatrix(h20_best_model, newdata = tune_test)
 
-test_rmse <- h2o.rmse(test_model)
-test_gini <- h2o.giniCoef(test_model)
+(test_rmse <- h2o.rmse(test_model))
+(test_gini <- h2o.giniCoef(test_model))
 row.names(test_confusionMatrix) <- c("Upgraded existing product line", "No upgrade of existing product line", "Totals")
 row.names(test_confusionMatrix)
 
@@ -248,10 +261,10 @@ test_confusionMatrix <- test_confusionMatrix %>%
   dplyr::select("Upgraded existing product line" = 1, "No upgrade of existing product line" = 2, Error, Rate)
 #View(test_confusionMatrix)
 h2o.precision(test_model)
-test_prediction <- h2o.predict(h20_best_model, newdata = h2o_test_upgradeproduct)
+test_prediction <- h2o.predict(h20_best_model, newdata = tune_test)
 
 test_prediction_with_rowid <- rowid_to_column(as.data.frame(test_prediction))
-test_data_with_rowid <- rowid_to_column(as.data.frame(h2o_test_upgradeproduct))
+test_data_with_rowid <- rowid_to_column(as.data.frame(tune_test))
 
 #View(test_prediction_with_rowid)
 test_predict_join <- full_join(test_data_with_rowid, test_prediction_with_rowid) %>%
